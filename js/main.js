@@ -72,13 +72,48 @@ async function loadUserData(username) {
 
 function renderCards() {
     const container = document.getElementById('cardsContainer');
+    const hiddenBar = document.getElementById('hiddenSectionsBar');
+    const hiddenList = document.getElementById('hiddenSectionsList');
 
     // Filter sections by current act
-    const sections = userData.sections
+    const allSections = userData.sections
         .filter(s => s.act === currentAct)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-    if (sections.length === 0) {
+    const visibleSections = allSections.filter(s => !s.hidden);
+    const hiddenSections = allSections.filter(s => s.hidden);
+
+    // Render hidden sections bar
+    if (hiddenSections.length > 0) {
+        hiddenBar.style.display = 'flex';
+        hiddenList.innerHTML = hiddenSections.map(section => `
+            <div class="hidden-section-chip" data-section-id="${section.id}" title="Click to show">
+                <span class="hidden-chip-title">${escapeHtml(section.title)}</span>
+                <span class="hidden-chip-icon">👁️</span>
+            </div>
+        `).join('');
+
+        // Add click handlers to unhide
+        hiddenList.querySelectorAll('.hidden-section-chip').forEach(chip => {
+            chip.addEventListener('click', async () => {
+                const sectionId = chip.dataset.sectionId;
+                const section = userData.sections.find(s => s.id === sectionId);
+                if (section) {
+                    section.hidden = false;
+                    const username = getCurrentUser();
+                    if (username) {
+                        await saveUserData(username, userData);
+                    }
+                    renderCards();
+                }
+            });
+        });
+    } else {
+        hiddenBar.style.display = 'none';
+    }
+
+    // Render visible sections
+    if (visibleSections.length === 0 && hiddenSections.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <h3>No sections yet</h3>
@@ -88,12 +123,25 @@ function renderCards() {
         return;
     }
 
-    container.innerHTML = sections.map(section => {
+    if (visibleSections.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>All sections hidden</h3>
+                <p>Click on a hidden section above to show it.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = visibleSections.map(section => {
         const style = buildCardStyle(section);
         return `
             <div class="card" data-section-id="${section.id}" style="${style}">
                 <div class="card-drag-handle" title="Drag to reorder">⋮⋮</div>
-                <div class="card-title">${escapeHtml(section.title)}</div>
+                <div class="card-title-row">
+                    <div class="card-title">${escapeHtml(section.title)}</div>
+                    <button class="card-visibility-btn" title="Hide section">👁️</button>
+                </div>
                 <div class="card-content">${section.content}</div>
                 <canvas class="doodle-canvas" style="display: none;"></canvas>
                 ${section.doodle ? `<img class="doodle-overlay" src="${section.doodle}" alt="">` : ''}
@@ -107,11 +155,12 @@ function renderCards() {
         `;
     }).join('');
 
-    // Attach resize, drag, and doodle handlers
+    // Attach resize, drag, doodle, and visibility handlers
     container.querySelectorAll('.card').forEach(card => {
         setupCardResize(card);
         setupCardDrag(card);
         setupCardDoodle(card);
+        setupCardVisibility(card);
     });
 }
 
@@ -539,6 +588,26 @@ function handleDoodleEsc(e) {
     if (e.key === 'Escape' && activeDoodleCard) {
         exitDoodleMode(activeDoodleCard);
     }
+}
+
+function setupCardVisibility(card) {
+    const visibilityBtn = card.querySelector('.card-visibility-btn');
+    if (!visibilityBtn) return;
+
+    visibilityBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sectionId = card.dataset.sectionId;
+        const section = userData.sections.find(s => s.id === sectionId);
+        
+        if (section) {
+            section.hidden = true;
+            const username = getCurrentUser();
+            if (username) {
+                await saveUserData(username, userData);
+            }
+            renderCards();
+        }
+    });
 }
 
 function exportUserData() {
