@@ -88,12 +88,21 @@ function renderCards() {
         return;
     }
 
-    container.innerHTML = sections.map(section => `
-        <div class="card">
-            <div class="card-title">${escapeHtml(section.title)}</div>
-            <div class="card-content">${section.content}</div>
-        </div>
-    `).join('');
+    container.innerHTML = sections.map(section => {
+        const style = buildCardStyle(section);
+        return `
+            <div class="card" data-section-id="${section.id}" style="${style}">
+                <div class="card-title">${escapeHtml(section.title)}</div>
+                <div class="card-content">${section.content}</div>
+                <div class="resize-handle"></div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach resize handlers
+    container.querySelectorAll('.card').forEach(card => {
+        setupCardResize(card);
+    });
 }
 
 function setupEventListeners() {
@@ -198,4 +207,57 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function buildCardStyle(section) {
+    const styles = [];
+    if (section.width) styles.push(`width: ${section.width}px`);
+    if (section.height) styles.push(`height: ${section.height}px`);
+    return styles.join('; ');
+}
+
+function setupCardResize(card) {
+    const handle = card.querySelector('.resize-handle');
+    if (!handle) return;
+
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = card.offsetWidth;
+        startHeight = card.offsetHeight;
+        document.body.style.cursor = 'se-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const newWidth = startWidth + (e.clientX - startX);
+        const newHeight = startHeight + (e.clientY - startY);
+        card.style.width = Math.max(200, newWidth) + 'px';
+        card.style.height = Math.max(100, newHeight) + 'px';
+    });
+
+    document.addEventListener('mouseup', async () => {
+        if (!isResizing) return;
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+
+        // Save the new size
+        const sectionId = card.dataset.sectionId;
+        const section = userData.sections.find(s => s.id === sectionId);
+        if (section) {
+            section.width = card.offsetWidth;
+            section.height = card.offsetHeight;
+            const username = getCurrentUser();
+            if (username) {
+                await saveUserData(username, userData);
+            }
+        }
+    });
 }
