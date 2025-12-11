@@ -95,15 +95,23 @@ function renderCards() {
                 <div class="card-drag-handle" title="Drag to reorder">⋮⋮</div>
                 <div class="card-title">${escapeHtml(section.title)}</div>
                 <div class="card-content">${section.content}</div>
+                <canvas class="doodle-canvas" style="display: none;"></canvas>
+                ${section.doodle ? `<img class="doodle-overlay" src="${section.doodle}" alt="">` : ''}
+                <div class="doodle-btn" title="Draw on card">✏️</div>
+                <div class="doodle-controls" style="display: none;">
+                    <button class="doodle-clear-btn" title="Clear drawing">Clear</button>
+                    <span class="doodle-hint">ESC to save</span>
+                </div>
                 <div class="resize-handle"></div>
             </div>
         `;
     }).join('');
 
-    // Attach resize and drag handlers
+    // Attach resize, drag, and doodle handlers
     container.querySelectorAll('.card').forEach(card => {
         setupCardResize(card);
         setupCardDrag(card);
+        setupCardDoodle(card);
     });
 }
 
@@ -163,6 +171,10 @@ function setupEventListeners() {
     const lightboxImage = document.getElementById('lightboxImage');
 
     document.getElementById('cardsContainer').addEventListener('click', (e) => {
+        // Don't open lightbox if in doodle mode
+        const card = e.target.closest('.card');
+        if (card && card.classList.contains('doodle-mode')) return;
+
         if (e.target.tagName === 'IMG' && e.target.closest('.card-content')) {
             lightboxImage.src = e.target.src;
             lightbox.style.display = 'flex';
@@ -370,4 +382,154 @@ function setupCardResize(card) {
             }
         }
     });
+}
+
+let activeDoodleCard = null;
+
+function setupCardDoodle(card) {
+    const canvas = card.querySelector('.doodle-canvas');
+    const doodleBtn = card.querySelector('.doodle-btn');
+    const doodleControls = card.querySelector('.doodle-controls');
+    const clearBtn = card.querySelector('.doodle-clear-btn');
+    const overlay = card.querySelector('.doodle-overlay');
+    const ctx = canvas.getContext('2d');
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    doodleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        enterDoodleMode(card, canvas, doodleControls, overlay);
+    });
+
+    clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (!card.classList.contains('doodle-mode')) return;
+        isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        lastX = e.clientX - rect.left;
+        lastY = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        lastX = x;
+        lastY = y;
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        isDrawing = false;
+    });
+
+    // Prevent clicks from propagating when in doodle mode
+    canvas.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+    });
+}
+
+function enterDoodleMode(card, canvas, controls, overlay) {
+    // Exit any other active doodle mode
+    if (activeDoodleCard && activeDoodleCard !== card) {
+        exitDoodleMode(activeDoodleCard);
+    }
+
+    activeDoodleCard = card;
+    card.classList.add('doodle-mode');
+
+    // Size canvas to card
+    const rect = card.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvas.style.display = 'block';
+    controls.style.display = 'flex';
+
+    // Load existing doodle if any
+    if (overlay && overlay.src) {
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+        };
+        img.src = overlay.src;
+        overlay.style.display = 'none';
+    }
+
+    // Add ESC listener
+    document.addEventListener('keydown', handleDoodleEsc);
+}
+
+async function exitDoodleMode(card) {
+    if (!card) return;
+
+    const canvas = card.querySelector('.doodle-canvas');
+    const controls = card.querySelector('.doodle-controls');
+    let overlay = card.querySelector('.doodle-overlay');
+
+    card.classList.remove('doodle-mode');
+    canvas.style.display = 'none';
+    controls.style.display = 'none';
+
+    // Save the doodle
+    const doodleData = canvas.toDataURL('image/png');
+    const sectionId = card.dataset.sectionId;
+    const section = userData.sections.find(s => s.id === sectionId);
+
+    if (section) {
+        // Check if canvas is empty
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const isEmpty = !imageData.data.some((channel, index) => index % 4 === 3 && channel !== 0);
+
+        if (isEmpty) {
+            section.doodle = null;
+            if (overlay) overlay.remove();
+        } else {
+            section.doodle = doodleData;
+
+            // Update or create overlay
+            if (!overlay) {
+                overlay = document.createElement('img');
+                overlay.className = 'doodle-overlay';
+                card.insertBefore(overlay, card.querySelector('.doodle-btn'));
+            }
+            overlay.src = doodleData;
+            overlay.style.display = 'block';
+        }
+
+        const username = getCurrentUser();
+        if (username) {
+            await saveUserData(username, userData);
+        }
+    }
+
+    document.removeEventListener('keydown', handleDoodleEsc);
+    activeDoodleCard = null;
+}
+
+function handleDoodleEsc(e) {
+    if (e.key === 'Escape' && activeDoodleCard) {
+        exitDoodleMode(activeDoodleCard);
+    }
 }
