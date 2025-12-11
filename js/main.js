@@ -166,6 +166,13 @@ function setupEventListeners() {
         }
     });
 
+    // Export/Import
+    document.getElementById('exportBtn').addEventListener('click', exportUserData);
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importFile').click();
+    });
+    document.getElementById('importFile').addEventListener('change', importUserData);
+
     // Image lightbox
     const lightbox = document.getElementById('lightbox');
     const lightboxImage = document.getElementById('lightboxImage');
@@ -532,4 +539,117 @@ function handleDoodleEsc(e) {
     if (e.key === 'Escape' && activeDoodleCard) {
         exitDoodleMode(activeDoodleCard);
     }
+}
+
+function exportUserData() {
+    const username = getCurrentUser();
+    if (!username) {
+        alert('Please select a user first');
+        return;
+    }
+
+    const exportData = {
+        version: 1,
+        username: username,
+        exportDate: new Date().toISOString(),
+        data: userData
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `poe2-guide-${username}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function importUserData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const importData = JSON.parse(text);
+
+        // Validate import data
+        if (!importData.data || !importData.data.sections) {
+            throw new Error('Invalid backup file format');
+        }
+
+        const importUsername = importData.username || 'imported';
+        const currentUsername = getCurrentUser();
+
+        // Ask user what to do
+        const action = confirm(
+            `Import data from "${importUsername}"?\n\n` +
+            `OK = Import as NEW user "${importUsername}"\n` +
+            `Cancel = Merge into current user "${currentUsername || 'none'}"`
+        );
+
+        if (action) {
+            // Import as new user
+            let targetUsername = importUsername;
+
+            // Check if user exists
+            const usersData = await getUsers();
+            if (usersData.users.includes(targetUsername)) {
+                const newName = prompt(
+                    `User "${targetUsername}" already exists. Enter a new username:`,
+                    targetUsername + '_imported'
+                );
+                if (!newName) {
+                    e.target.value = '';
+                    return;
+                }
+                targetUsername = newName.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            }
+
+            // Create new user
+            await createUser(targetUsername);
+
+            // Save imported data
+            await saveUserData(targetUsername, importData.data);
+
+            // Refresh and select new user
+            await loadUsers();
+            document.getElementById('userSelect').value = targetUsername;
+            setCurrentUser(targetUsername);
+            updateUserIcon(targetUsername);
+            await loadUserData(targetUsername);
+
+            alert(`Data imported successfully as user "${targetUsername}"`);
+        } else {
+            // Merge into current user
+            if (!currentUsername) {
+                alert('Please select a user first to merge into');
+                e.target.value = '';
+                return;
+            }
+
+            const mergeConfirm = confirm(
+                `This will ADD ${importData.data.sections.length} sections to "${currentUsername}".\n\n` +
+                `Existing sections will NOT be replaced. Continue?`
+            );
+
+            if (mergeConfirm) {
+                // Add imported sections with new IDs
+                for (const section of importData.data.sections) {
+                    const newSection = { ...section, id: generateId() };
+                    userData.sections.push(newSection);
+                }
+
+                await saveUserData(currentUsername, userData);
+                renderCards();
+                alert(`${importData.data.sections.length} sections merged successfully`);
+            }
+        }
+    } catch (error) {
+        alert('Failed to import: ' + error.message);
+    }
+
+    e.target.value = '';
 }
