@@ -173,6 +173,25 @@ function setupEventListeners() {
         updateThemeButton(newTheme);
     });
 
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebarToggle) {
+        // Restore saved state
+        const isCollapsed = localStorage.getItem('poe2_sidebar_collapsed') === 'true';
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            document.querySelector('.main-content').classList.add('sidebar-collapsed');
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            document.querySelector('.main-content').classList.toggle('sidebar-collapsed');
+            const nowCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('poe2_sidebar_collapsed', nowCollapsed);
+        });
+    }
+
     // User selection
     document.getElementById('userSelect').addEventListener('change', async (e) => {
         const username = e.target.value;

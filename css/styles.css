@@ -138,6 +138,61 @@ body {
     background: var(--sidebar-bg);
     padding: 20px 0;
     z-index: 50;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.sidebar-content {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-toggle {
+    position: fixed;
+    top: 50%;
+    left: 148px;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 48px;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: background 0.2s, color 0.2s, left 0.3s ease;
+    z-index: 51;
+}
+
+.sidebar-toggle:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.sidebar.collapsed {
+    width: 0;
+    padding: 0;
+}
+
+.sidebar.collapsed .sidebar-content {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    left: 0;
+}
+
+.sidebar-toggle::after {
+    content: '‹';
+}
+
+.sidebar.collapsed .sidebar-toggle::after {
+    content: '›';
 }
 
 .sidebar-title {
@@ -156,6 +211,7 @@ body {
     cursor: pointer;
     transition: background 0.2s;
     border-left: 3px solid transparent;
+    white-space: nowrap;
 }
 
 .nav-item:hover {
@@ -174,6 +230,11 @@ body {
     margin-left: 160px;
     padding: 20px;
     min-height: calc(100vh - 50px);
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+    margin-left: 20px;
 }
 
 /* Cards */
