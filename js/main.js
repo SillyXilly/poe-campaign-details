@@ -92,6 +92,7 @@ function renderCards() {
         const style = buildCardStyle(section);
         return `
             <div class="card" data-section-id="${section.id}" style="${style}">
+                <div class="card-drag-handle" title="Drag to reorder">⋮⋮</div>
                 <div class="card-title">${escapeHtml(section.title)}</div>
                 <div class="card-content">${section.content}</div>
                 <div class="resize-handle"></div>
@@ -99,9 +100,10 @@ function renderCards() {
         `;
     }).join('');
 
-    // Attach resize handlers
+    // Attach resize and drag handlers
     container.querySelectorAll('.card').forEach(card => {
         setupCardResize(card);
+        setupCardDrag(card);
     });
 }
 
@@ -214,6 +216,114 @@ function buildCardStyle(section) {
     if (section.width) styles.push(`width: ${section.width}px`);
     if (section.height) styles.push(`height: ${section.height}px`);
     return styles.join('; ');
+}
+
+let dragState = {
+    card: null,
+    offsetX: 0,
+    offsetY: 0,
+    placeholder: null
+};
+
+function setupCardDrag(card) {
+    const handle = card.querySelector('.card-drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+
+        const rect = card.getBoundingClientRect();
+        dragState.card = card;
+        dragState.offsetX = e.clientX - rect.left;
+        dragState.offsetY = e.clientY - rect.top;
+
+        // Create placeholder
+        dragState.placeholder = document.createElement('div');
+        dragState.placeholder.className = 'card-placeholder';
+        dragState.placeholder.style.width = rect.width + 'px';
+        dragState.placeholder.style.height = rect.height + 'px';
+        card.parentNode.insertBefore(dragState.placeholder, card);
+
+        // Make card follow cursor
+        card.classList.add('dragging');
+        card.style.position = 'fixed';
+        card.style.left = rect.left + 'px';
+        card.style.top = rect.top + 'px';
+        card.style.width = rect.width + 'px';
+        card.style.zIndex = '1000';
+
+        document.body.style.userSelect = 'none';
+    });
+}
+
+document.addEventListener('mousemove', (e) => {
+    if (!dragState.card) return;
+
+    const card = dragState.card;
+    card.style.left = (e.clientX - dragState.offsetX) + 'px';
+    card.style.top = (e.clientY - dragState.offsetY) + 'px';
+
+    // Find drop position
+    const container = document.getElementById('cardsContainer');
+    const cards = Array.from(container.querySelectorAll('.card:not(.dragging)'));
+    const afterElement = getDragAfterElement(cards, e.clientX, e.clientY);
+
+    if (afterElement) {
+        container.insertBefore(dragState.placeholder, afterElement);
+    } else {
+        container.appendChild(dragState.placeholder);
+    }
+});
+
+document.addEventListener('mouseup', async () => {
+    if (!dragState.card) return;
+
+    const card = dragState.card;
+    const container = document.getElementById('cardsContainer');
+
+    // Insert card at placeholder position
+    container.insertBefore(card, dragState.placeholder);
+    dragState.placeholder.remove();
+
+    // Reset card styles
+    card.classList.remove('dragging');
+    card.style.position = '';
+    card.style.left = '';
+    card.style.top = '';
+    card.style.zIndex = '';
+    document.body.style.userSelect = '';
+
+    // Update order based on DOM positions
+    const cards = Array.from(container.querySelectorAll('.card'));
+    cards.forEach((c, index) => {
+        const sectionId = c.dataset.sectionId;
+        const section = userData.sections.find(s => s.id === sectionId);
+        if (section) {
+            section.order = index;
+        }
+    });
+
+    const username = getCurrentUser();
+    if (username) {
+        await saveUserData(username, userData);
+    }
+
+    dragState.card = null;
+    dragState.placeholder = null;
+});
+
+function getDragAfterElement(cards, x, y) {
+    return cards.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offsetX = x - box.left - box.width / 2;
+        const offsetY = y - box.top - box.height / 2;
+        const offset = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+
+        if (offset < closest.offset) {
+            return { offset, element: child };
+        }
+        return closest;
+    }, { offset: Number.POSITIVE_INFINITY }).element;
 }
 
 function setupCardResize(card) {

@@ -79,6 +79,7 @@
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                     <button class="btn" id="saveBtn">Save</button>
                     <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    <button class="btn btn-secondary" id="copyToActBtn">Copy to Act</button>
                     <button class="btn btn-danger" id="deleteBtn" style="margin-left: auto;">Delete</button>
                 </div>
             </div>
@@ -98,6 +99,29 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
                 <button class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy to Act Modal -->
+    <div class="modal-overlay" id="copyModal" style="display: none;">
+        <div class="modal">
+            <h3>Copy Section to Act</h3>
+            <div class="form-group">
+                <label for="copyTargetAct">Select target act</label>
+                <select id="copyTargetAct">
+                    <option value="act1">Act 1</option>
+                    <option value="act2">Act 2</option>
+                    <option value="act3">Act 3</option>
+                    <option value="act4">Act 4</option>
+                    <option value="interlude1">Interlude I</option>
+                    <option value="interlude2">Interlude II</option>
+                    <option value="interlude3">Interlude III</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelCopy">Cancel</button>
+                <button class="btn" id="confirmCopy">Copy</button>
             </div>
         </div>
     </div>

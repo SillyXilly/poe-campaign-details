@@ -225,6 +225,18 @@ function setupEventListeners() {
         }
     });
 
+    // Copy to Act modal
+    document.getElementById('copyToActBtn').addEventListener('click', openCopyModal);
+    document.getElementById('cancelCopy').addEventListener('click', () => {
+        document.getElementById('copyModal').style.display = 'none';
+    });
+    document.getElementById('confirmCopy').addEventListener('click', confirmCopySection);
+    document.getElementById('copyModal').addEventListener('click', (e) => {
+        if (e.target.id === 'copyModal') {
+            document.getElementById('copyModal').style.display = 'none';
+        }
+    });
+
     // Rich text toolbar
     document.querySelectorAll('.toolbar-btn[data-cmd]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -284,4 +296,56 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function openCopyModal() {
+    if (!currentSection) return;
+
+    // Set default to a different act than current
+    const select = document.getElementById('copyTargetAct');
+    const options = Array.from(select.options);
+    const differentAct = options.find(opt => opt.value !== currentSection.act);
+    if (differentAct) {
+        select.value = differentAct.value;
+    }
+
+    document.getElementById('copyModal').style.display = 'flex';
+}
+
+async function confirmCopySection() {
+    if (!currentSection) return;
+
+    const targetAct = document.getElementById('copyTargetAct').value;
+
+    // Create a copy with new ID
+    const copiedSection = {
+        id: generateId(),
+        act: targetAct,
+        title: currentSection.title || document.getElementById('sectionTitle').value.trim(),
+        content: currentSection.content || document.getElementById('editorContent').innerHTML,
+        order: userData.sections.filter(s => s.act === targetAct).length
+    };
+
+    // Copy size properties if they exist
+    if (currentSection.width) copiedSection.width = currentSection.width;
+    if (currentSection.height) copiedSection.height = currentSection.height;
+
+    userData.sections.push(copiedSection);
+    await saveAllData();
+
+    document.getElementById('copyModal').style.display = 'none';
+    alert(`Section copied to ${getActName(targetAct)}`);
+}
+
+function getActName(actId) {
+    const names = {
+        act1: 'Act 1',
+        act2: 'Act 2',
+        act3: 'Act 3',
+        act4: 'Act 4',
+        interlude1: 'Interlude I',
+        interlude2: 'Interlude II',
+        interlude3: 'Interlude III'
+    };
+    return names[actId] || actId;
 }

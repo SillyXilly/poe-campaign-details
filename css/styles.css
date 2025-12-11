@@ -198,6 +198,45 @@ body {
     flex-shrink: 0;
 }
 
+.card-drag-handle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    user-select: none;
+}
+
+.card-drag-handle:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.card-drag-handle:active {
+    cursor: grabbing;
+}
+
+.card.dragging {
+    opacity: 0.9;
+    border: 2px dashed var(--accent);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.card-placeholder {
+    background: var(--border-color);
+    border: 2px dashed var(--accent);
+    border-radius: 8px;
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
 .resize-handle {
     position: absolute;
     bottom: 0;
