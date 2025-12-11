@@ -34,6 +34,15 @@
     <div class="editor-layout">
         <!-- Left Panel - Section List -->
         <aside class="editor-sidebar">
+            <div class="bulk-actions-bar" id="bulkActionsBar">
+                <button class="btn btn-small" id="bulkSelectBtn" title="Select multiple sections to copy">☑ Select</button>
+                <div class="bulk-actions-active" id="bulkActionsActive" style="display: none;">
+                    <span class="bulk-count" id="bulkCount">0 selected</span>
+                    <button class="btn btn-small" id="bulkCopyBtn">Copy to Act</button>
+                    <button class="btn btn-small btn-secondary" id="bulkCancelBtn">Cancel</button>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label>Act</label>
                 <select id="actSelect">
@@ -122,6 +131,30 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="cancelCopy">Cancel</button>
                 <button class="btn" id="confirmCopy">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Copy Modal -->
+    <div class="modal-overlay" id="bulkCopyModal" style="display: none;">
+        <div class="modal">
+            <h3>Copy Sections to Act</h3>
+            <p id="bulkCopyCount" style="margin-bottom: 15px; color: var(--text-secondary);">0 sections selected</p>
+            <div class="form-group">
+                <label for="bulkCopyTargetAct">Select target act</label>
+                <select id="bulkCopyTargetAct">
+                    <option value="act1">Act 1</option>
+                    <option value="act2">Act 2</option>
+                    <option value="act3">Act 3</option>
+                    <option value="act4">Act 4</option>
+                    <option value="interlude1">Interlude I</option>
+                    <option value="interlude2">Interlude II</option>
+                    <option value="interlude3">Interlude III</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelBulkCopy">Cancel</button>
+                <button class="btn" id="confirmBulkCopy">Copy All</button>
             </div>
         </div>
     </div>

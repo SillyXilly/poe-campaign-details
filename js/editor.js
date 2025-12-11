@@ -2,6 +2,8 @@ let currentAct = 'act1';
 let userData = { sections: [] };
 let currentSection = null;
 let isDirty = false;
+let bulkSelectMode = false;
+let selectedSections = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize theme
@@ -59,16 +61,33 @@ function renderSectionList() {
         return;
     }
 
-    list.innerHTML = sections.map(section => `
-        <div class="section-item ${currentSection?.id === section.id ? 'active' : ''}" data-id="${section.id}" draggable="true">
-            <span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>
-            <span class="section-item-title">${escapeHtml(section.title || 'Untitled')}</span>
-        </div>
-    `).join('');
+    list.innerHTML = sections.map(section => {
+        const isSelected = selectedSections.has(section.id);
+        const isActive = currentSection?.id === section.id && !bulkSelectMode;
+        return `
+            <div class="section-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''} ${bulkSelectMode ? 'select-mode' : ''}" data-id="${section.id}" draggable="${!bulkSelectMode}">
+                ${bulkSelectMode ? `<span class="section-checkbox">${isSelected ? '☑' : '☐'}</span>` : '<span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>'}
+                <span class="section-item-title">${escapeHtml(section.title || 'Untitled')}</span>
+            </div>
+        `;
+    }).join('');
 
     // Add click handlers
     list.querySelectorAll('.section-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            if (bulkSelectMode) {
+                // Toggle selection
+                const sectionId = item.dataset.id;
+                if (selectedSections.has(sectionId)) {
+                    selectedSections.delete(sectionId);
+                } else {
+                    selectedSections.add(sectionId);
+                }
+                updateBulkCount();
+                renderSectionList();
+                return;
+            }
+
             // Ignore clicks on drag handle
             if (e.target.classList.contains('section-drag-handle')) return;
             
@@ -82,8 +101,10 @@ function renderSectionList() {
         });
     });
 
-    // Setup drag and drop
-    setupSectionDragDrop();
+    // Setup drag and drop (only when not in select mode)
+    if (!bulkSelectMode) {
+        setupSectionDragDrop();
+    }
 }
 
 function loadSection(section) {
@@ -241,6 +262,22 @@ function setupEventListeners() {
     document.getElementById('copyModal').addEventListener('click', (e) => {
         if (e.target.id === 'copyModal') {
             document.getElementById('copyModal').style.display = 'none';
+        }
+    });
+
+    // Bulk select mode
+    document.getElementById('bulkSelectBtn').addEventListener('click', enterBulkSelectMode);
+    document.getElementById('bulkCancelBtn').addEventListener('click', exitBulkSelectMode);
+    document.getElementById('bulkCopyBtn').addEventListener('click', openBulkCopyModal);
+
+    // Bulk copy modal
+    document.getElementById('cancelBulkCopy').addEventListener('click', () => {
+        document.getElementById('bulkCopyModal').style.display = 'none';
+    });
+    document.getElementById('confirmBulkCopy').addEventListener('click', confirmBulkCopy);
+    document.getElementById('bulkCopyModal').addEventListener('click', (e) => {
+        if (e.target.id === 'bulkCopyModal') {
+            document.getElementById('bulkCopyModal').style.display = 'none';
         }
     });
 
@@ -438,4 +475,78 @@ async function handleDrop(e) {
     if (username) {
         await saveUserData(username, userData);
     }
+}
+
+// Bulk selection functions
+function enterBulkSelectMode() {
+    bulkSelectMode = true;
+    selectedSections.clear();
+    document.getElementById('bulkSelectBtn').style.display = 'none';
+    document.getElementById('bulkActionsActive').style.display = 'flex';
+    updateBulkCount();
+    renderSectionList();
+}
+
+function exitBulkSelectMode() {
+    bulkSelectMode = false;
+    selectedSections.clear();
+    document.getElementById('bulkSelectBtn').style.display = 'block';
+    document.getElementById('bulkActionsActive').style.display = 'none';
+    renderSectionList();
+}
+
+function updateBulkCount() {
+    const count = selectedSections.size;
+    document.getElementById('bulkCount').textContent = `${count} selected`;
+    document.getElementById('bulkCopyBtn').disabled = count === 0;
+}
+
+function openBulkCopyModal() {
+    if (selectedSections.size === 0) {
+        alert('Please select at least one section');
+        return;
+    }
+
+    // Set default to a different act
+    const select = document.getElementById('bulkCopyTargetAct');
+    const options = Array.from(select.options);
+    const differentAct = options.find(opt => opt.value !== currentAct);
+    if (differentAct) {
+        select.value = differentAct.value;
+    }
+
+    document.getElementById('bulkCopyCount').textContent = `${selectedSections.size} section${selectedSections.size > 1 ? 's' : ''} selected`;
+    document.getElementById('bulkCopyModal').style.display = 'flex';
+}
+
+async function confirmBulkCopy() {
+    const targetAct = document.getElementById('bulkCopyTargetAct').value;
+    const targetActSections = userData.sections.filter(s => s.act === targetAct);
+    let startOrder = targetActSections.length;
+
+    // Copy each selected section
+    for (const sectionId of selectedSections) {
+        const originalSection = userData.sections.find(s => s.id === sectionId);
+        if (originalSection) {
+            const copiedSection = {
+                id: generateId(),
+                act: targetAct,
+                title: originalSection.title,
+                content: originalSection.content,
+                order: startOrder++
+            };
+
+            // Copy size properties if they exist
+            if (originalSection.width) copiedSection.width = originalSection.width;
+            if (originalSection.height) copiedSection.height = originalSection.height;
+
+            userData.sections.push(copiedSection);
+        }
+    }
+
+    await saveAllData();
+
+    document.getElementById('bulkCopyModal').style.display = 'none';
+    alert(`${selectedSections.size} section${selectedSections.size > 1 ? 's' : ''} copied to ${getActName(targetAct)}`);
+    exitBulkSelectMode();
 }
