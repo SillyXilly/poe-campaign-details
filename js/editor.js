@@ -60,14 +60,18 @@ function renderSectionList() {
     }
 
     list.innerHTML = sections.map(section => `
-        <div class="section-item ${currentSection?.id === section.id ? 'active' : ''}" data-id="${section.id}">
+        <div class="section-item ${currentSection?.id === section.id ? 'active' : ''}" data-id="${section.id}" draggable="true">
+            <span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>
             <span class="section-item-title">${escapeHtml(section.title || 'Untitled')}</span>
         </div>
     `).join('');
 
     // Add click handlers
     list.querySelectorAll('.section-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+            // Ignore clicks on drag handle
+            if (e.target.classList.contains('section-drag-handle')) return;
+            
             if (isDirty && !confirm('You have unsaved changes. Discard them?')) {
                 return;
             }
@@ -77,6 +81,9 @@ function renderSectionList() {
             }
         });
     });
+
+    // Setup drag and drop
+    setupSectionDragDrop();
 }
 
 function loadSection(section) {
@@ -348,4 +355,87 @@ function getActName(actId) {
         interlude3: 'Interlude III'
     };
     return names[actId] || actId;
+}
+
+// Drag and drop for section reordering
+let draggedItem = null;
+
+function setupSectionDragDrop() {
+    const list = document.getElementById('sectionList');
+    const items = list.querySelectorAll('.section-item');
+
+    items.forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragend', handleDragEnd);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('dragenter', handleDragEnter);
+        item.addEventListener('dragleave', handleDragLeave);
+        item.addEventListener('drop', handleDrop);
+    });
+}
+
+function handleDragStart(e) {
+    draggedItem = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.id);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.section-item').forEach(item => {
+        item.classList.remove('drag-over');
+    });
+    draggedItem = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedItem) {
+        this.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+
+    if (this === draggedItem) return;
+
+    const list = document.getElementById('sectionList');
+    const items = Array.from(list.querySelectorAll('.section-item'));
+    
+    const draggedIdx = items.indexOf(draggedItem);
+    const targetIdx = items.indexOf(this);
+
+    // Reorder in DOM
+    if (draggedIdx < targetIdx) {
+        this.parentNode.insertBefore(draggedItem, this.nextSibling);
+    } else {
+        this.parentNode.insertBefore(draggedItem, this);
+    }
+
+    // Update order in data
+    const reorderedItems = Array.from(list.querySelectorAll('.section-item'));
+    reorderedItems.forEach((item, index) => {
+        const section = userData.sections.find(s => s.id === item.dataset.id);
+        if (section) {
+            section.order = index;
+        }
+    });
+
+    // Save changes
+    const username = getCurrentUser();
+    if (username) {
+        await saveUserData(username, userData);
+    }
 }
