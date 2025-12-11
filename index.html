@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoE2 Campaign Guide</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <div class="user-section">
+            <div class="user-icon" id="userIcon">?</div>
+            <select class="user-select" id="userSelect">
+                <option value="">Select User</option>
+            </select>
+            <button class="btn btn-secondary" id="newUserBtn">+ New</button>
+        </div>
+        <div class="top-actions">
+            <a href="editor.html" class="btn">Edit Guide</a>
+            <button class="theme-toggle" id="themeToggle">🌙</button>
+        </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-title">Campaign</div>
+        <div class="nav-item active" data-act="act1">Act 1</div>
+        <div class="nav-item" data-act="act2">Act 2</div>
+        <div class="nav-item" data-act="act3">Act 3</div>
+        <div class="nav-item" data-act="act4">Act 4</div>
+        <div class="nav-item" data-act="interlude1">Interlude I</div>
+        <div class="nav-item" data-act="interlude2">Interlude II</div>
+        <div class="nav-item" data-act="interlude3">Interlude III</div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="cards-container" id="cardsContainer">
+            <div class="empty-state" id="emptyState">
+                <h3>No sections yet</h3>
+                <p>Select a user and click "Edit Guide" to add content.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox-overlay" id="lightbox" style="display: none;">
+        <img src="" alt="Expanded image" id="lightboxImage">
+    </div>
+
+    <!-- New User Modal -->
+    <div class="modal-overlay" id="newUserModal" style="display: none;">
+        <div class="modal">
+            <h3>Create New User</h3>
+            <div class="form-group">
+                <label for="newUsername">Username</label>
+                <input type="text" id="newUsername" placeholder="Enter username">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelNewUser">Cancel</button>
+                <button class="btn" id="confirmNewUser">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

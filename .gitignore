@@ -1,0 +1,15 @@
+# Data files
+data/
+users/
+
+# AI/Claude files
+.claude/
+CLAUDE.md
+*.ai.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
