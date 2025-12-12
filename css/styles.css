@@ -556,6 +556,9 @@ body {
     border-right: 1px solid var(--border-color);
     padding: 20px;
     overflow-y: auto;
+    height: calc(100vh - 50px);
+    position: sticky;
+    top: 50px;
 }
 
 .editor-main {
@@ -1021,5 +1024,8 @@ body {
         width: 100%;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
+        height: auto;
+        max-height: 50vh;
+        position: static;
     }
 }
