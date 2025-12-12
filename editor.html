@@ -36,10 +36,17 @@
         <aside class="editor-sidebar">
             <div class="bulk-actions-bar" id="bulkActionsBar">
                 <button class="btn btn-small" id="bulkSelectBtn" title="Select multiple sections to copy">☑ Select</button>
+                <button class="btn btn-small" id="linkSectionsBtn" title="Link sections together">🔗 Link</button>
                 <div class="bulk-actions-active" id="bulkActionsActive" style="display: none;">
                     <span class="bulk-count" id="bulkCount">0 selected</span>
                     <button class="btn btn-small" id="bulkCopyBtn">Copy to Act</button>
                     <button class="btn btn-small btn-secondary" id="bulkCancelBtn">Cancel</button>
+                </div>
+                <div class="link-mode-active" id="linkModeActive" style="display: none;">
+                    <div class="link-color-picker" id="linkColorPicker"></div>
+                    <span class="link-count" id="linkCount">0 in chain</span>
+                    <button class="btn btn-small" id="saveLinkBtn">Save Link</button>
+                    <button class="btn btn-small btn-secondary" id="cancelLinkBtn">Cancel</button>
                 </div>
             </div>
 
@@ -57,6 +64,11 @@
             </div>
 
             <button class="btn" id="newSectionBtn" style="width: 100%; margin-bottom: 15px;">+ New Section</button>
+
+            <div class="existing-links" id="existingLinks" style="display: none;">
+                <div class="existing-links-title">Linked Chains</div>
+                <div class="existing-links-list" id="existingLinksList"></div>
+            </div>
 
             <div class="section-list" id="sectionList">
                 <!-- Sections will be rendered here -->

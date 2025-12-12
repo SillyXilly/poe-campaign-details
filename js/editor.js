@@ -1,9 +1,23 @@
 let currentAct = 'act1';
-let userData = { sections: [] };
+let userData = { sections: [], links: [] };
 let currentSection = null;
 let isDirty = false;
 let bulkSelectMode = false;
 let selectedSections = new Set();
+let linkMode = false;
+let linkChain = [];
+let selectedLinkColor = null;
+
+const LINK_COLORS = [
+    { name: 'Red', color: '#e74c3c' },
+    { name: 'Orange', color: '#e67e22' },
+    { name: 'Yellow', color: '#f1c40f' },
+    { name: 'Green', color: '#2ecc71' },
+    { name: 'Cyan', color: '#00bcd4' },
+    { name: 'Blue', color: '#3498db' },
+    { name: 'Purple', color: '#9b59b6' },
+    { name: 'Pink', color: '#e91e63' }
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize theme
@@ -34,9 +48,13 @@ async function loadUserData() {
     const username = getCurrentUser();
     try {
         userData = await getUserData(username);
+        // Ensure links array exists
+        if (!userData.links) {
+            userData.links = [];
+        }
     } catch (error) {
         console.error('Failed to load user data:', error);
-        userData = { sections: [] };
+        userData = { sections: [], links: [] };
     }
 }
 
@@ -58,15 +76,32 @@ function renderSectionList() {
 
     if (sections.length === 0) {
         list.innerHTML = '<div style="color: var(--text-secondary); font-size: 14px;">No sections for this act yet.</div>';
+        renderExistingLinks();
         return;
     }
 
     list.innerHTML = sections.map(section => {
         const isSelected = selectedSections.has(section.id);
-        const isActive = currentSection?.id === section.id && !bulkSelectMode;
+        const isActive = currentSection?.id === section.id && !bulkSelectMode && !linkMode;
+        const isInLinkChain = linkChain.includes(section.id);
+        const linkIndex = linkChain.indexOf(section.id);
+        const sectionLink = getSectionLink(section.id);
+        
+        let prefix = '';
+        if (linkMode) {
+            prefix = `<span class="section-link-number" style="background: ${selectedLinkColor || '#666'}">${isInLinkChain ? linkIndex + 1 : ''}</span>`;
+        } else if (bulkSelectMode) {
+            prefix = `<span class="section-checkbox">${isSelected ? '☑' : '☐'}</span>`;
+        } else {
+            prefix = '<span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>';
+        }
+
+        const linkIndicator = sectionLink && !linkMode ? `<span class="section-link-dot" style="background: ${sectionLink.color}" title="Part of linked chain"></span>` : '';
+
         return `
-            <div class="section-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''} ${bulkSelectMode ? 'select-mode' : ''}" data-id="${section.id}" draggable="${!bulkSelectMode}">
-                ${bulkSelectMode ? `<span class="section-checkbox">${isSelected ? '☑' : '☐'}</span>` : '<span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>'}
+            <div class="section-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''} ${isInLinkChain ? 'in-link-chain' : ''} ${bulkSelectMode || linkMode ? 'select-mode' : ''}" data-id="${section.id}" draggable="${!bulkSelectMode && !linkMode}">
+                ${prefix}
+                ${linkIndicator}
                 <span class="section-item-title">${escapeHtml(section.title || 'Untitled')}</span>
             </div>
         `;
@@ -75,6 +110,20 @@ function renderSectionList() {
     // Add click handlers
     list.querySelectorAll('.section-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            if (linkMode) {
+                // Toggle in link chain
+                const sectionId = item.dataset.id;
+                const idx = linkChain.indexOf(sectionId);
+                if (idx >= 0) {
+                    linkChain.splice(idx, 1);
+                } else {
+                    linkChain.push(sectionId);
+                }
+                updateLinkCount();
+                renderSectionList();
+                return;
+            }
+
             if (bulkSelectMode) {
                 // Toggle selection
                 const sectionId = item.dataset.id;
@@ -101,10 +150,65 @@ function renderSectionList() {
         });
     });
 
-    // Setup drag and drop (only when not in select mode)
-    if (!bulkSelectMode) {
+    // Setup drag and drop (only when not in select/link mode)
+    if (!bulkSelectMode && !linkMode) {
         setupSectionDragDrop();
     }
+
+    renderExistingLinks();
+}
+
+function getSectionLink(sectionId) {
+    return userData.links?.find(link => link.sectionIds.includes(sectionId));
+}
+
+function renderExistingLinks() {
+    const container = document.getElementById('existingLinks');
+    const list = document.getElementById('existingLinksList');
+    
+    // Filter links that have sections in current act
+    const relevantLinks = (userData.links || []).filter(link => {
+        return link.sectionIds.some(id => {
+            const section = userData.sections.find(s => s.id === id);
+            return section && section.act === currentAct;
+        });
+    });
+
+    if (relevantLinks.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = relevantLinks.map(link => {
+        const sectionNames = link.sectionIds
+            .map(id => userData.sections.find(s => s.id === id))
+            .filter(Boolean)
+            .map(s => s.title || 'Untitled');
+        
+        return `
+            <div class="existing-link-item" data-link-id="${link.id}">
+                <span class="link-color-indicator" style="background: ${link.color}"></span>
+                <span class="link-sections-preview">${sectionNames.join(' → ')}</span>
+                <button class="link-delete-btn" title="Delete link">✕</button>
+            </div>
+        `;
+    }).join('');
+
+    // Add delete handlers
+    list.querySelectorAll('.link-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const linkItem = btn.closest('.existing-link-item');
+            const linkId = linkItem.dataset.linkId;
+            
+            if (confirm('Delete this link chain?')) {
+                userData.links = userData.links.filter(l => l.id !== linkId);
+                await saveAllData();
+                renderSectionList();
+            }
+        });
+    });
 }
 
 function loadSection(section) {
@@ -280,6 +384,14 @@ function setupEventListeners() {
             document.getElementById('bulkCopyModal').style.display = 'none';
         }
     });
+
+    // Link sections mode
+    document.getElementById('linkSectionsBtn').addEventListener('click', enterLinkMode);
+    document.getElementById('cancelLinkBtn').addEventListener('click', exitLinkMode);
+    document.getElementById('saveLinkBtn').addEventListener('click', saveLink);
+
+    // Initialize color picker
+    initLinkColorPicker();
 
     // Rich text toolbar
     document.querySelectorAll('.toolbar-btn[data-cmd]').forEach(btn => {
@@ -549,4 +661,91 @@ async function confirmBulkCopy() {
     document.getElementById('bulkCopyModal').style.display = 'none';
     alert(`${selectedSections.size} section${selectedSections.size > 1 ? 's' : ''} copied to ${getActName(targetAct)}`);
     exitBulkSelectMode();
+}
+
+// Link mode functions
+function initLinkColorPicker() {
+    const picker = document.getElementById('linkColorPicker');
+    picker.innerHTML = LINK_COLORS.map((c, i) => `
+        <div class="link-color-option ${i === 0 ? 'selected' : ''}" data-color="${c.color}" style="background: ${c.color}" title="${c.name}"></div>
+    `).join('');
+
+    selectedLinkColor = LINK_COLORS[0].color;
+
+    picker.querySelectorAll('.link-color-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            picker.querySelectorAll('.link-color-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            selectedLinkColor = opt.dataset.color;
+            renderSectionList();
+        });
+    });
+}
+
+function enterLinkMode() {
+    linkMode = true;
+    linkChain = [];
+    document.getElementById('bulkSelectBtn').style.display = 'none';
+    document.getElementById('linkSectionsBtn').style.display = 'none';
+    document.getElementById('linkModeActive').style.display = 'flex';
+    updateLinkCount();
+    renderSectionList();
+}
+
+function exitLinkMode() {
+    linkMode = false;
+    linkChain = [];
+    selectedLinkColor = LINK_COLORS[0].color;
+    document.getElementById('bulkSelectBtn').style.display = 'block';
+    document.getElementById('linkSectionsBtn').style.display = 'block';
+    document.getElementById('linkModeActive').style.display = 'none';
+    
+    // Reset color picker selection
+    const picker = document.getElementById('linkColorPicker');
+    picker.querySelectorAll('.link-color-option').forEach((o, i) => {
+        o.classList.toggle('selected', i === 0);
+    });
+    
+    renderSectionList();
+}
+
+function updateLinkCount() {
+    document.getElementById('linkCount').textContent = `${linkChain.length} in chain`;
+    document.getElementById('saveLinkBtn').disabled = linkChain.length < 2;
+}
+
+async function saveLink() {
+    if (linkChain.length < 2) {
+        alert('Please select at least 2 sections to link');
+        return;
+    }
+
+    // Check if any section is already in another link
+    for (const sectionId of linkChain) {
+        const existingLink = getSectionLink(sectionId);
+        if (existingLink) {
+            const section = userData.sections.find(s => s.id === sectionId);
+            if (!confirm(`"${section?.title || 'Untitled'}" is already in a link chain. Remove it from the existing chain and add to this one?`)) {
+                return;
+            }
+            // Remove from existing link
+            existingLink.sectionIds = existingLink.sectionIds.filter(id => id !== sectionId);
+            // Clean up empty links
+            if (existingLink.sectionIds.length < 2) {
+                userData.links = userData.links.filter(l => l.id !== existingLink.id);
+            }
+        }
+    }
+
+    const newLink = {
+        id: generateId(),
+        color: selectedLinkColor,
+        sectionIds: [...linkChain]
+    };
+
+    userData.links.push(newLink);
+    await saveAllData();
+
+    alert(`Linked ${linkChain.length} sections together!`);
+    exitLinkMode();
 }

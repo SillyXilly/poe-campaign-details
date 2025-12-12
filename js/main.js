@@ -1,5 +1,5 @@
 let currentAct = 'act1';
-let userData = { sections: [] };
+let userData = { sections: [], links: [] };
 
 const ACTS = [
     { id: 'act1', name: 'Act 1' },
@@ -55,17 +55,18 @@ async function loadUsers() {
 
 async function loadUserData(username) {
     if (!username) {
-        userData = { sections: [] };
+        userData = { sections: [], links: [] };
         renderCards();
         return;
     }
 
     try {
         userData = await getUserData(username);
+        if (!userData.links) userData.links = [];
         renderCards();
     } catch (error) {
         console.error('Failed to load user data:', error);
-        userData = { sections: [] };
+        userData = { sections: [], links: [] };
         renderCards();
     }
 }
@@ -86,12 +87,20 @@ function renderCards() {
     // Render hidden sections bar
     if (hiddenSections.length > 0) {
         hiddenBar.style.display = 'flex';
-        hiddenList.innerHTML = hiddenSections.map(section => `
-            <div class="hidden-section-chip" data-section-id="${section.id}" title="Click to show">
-                <span class="hidden-chip-title">${escapeHtml(section.title)}</span>
-                <span class="hidden-chip-icon">👁️</span>
-            </div>
-        `).join('');
+        hiddenList.innerHTML = hiddenSections.map(section => {
+            const linkInfo = getSectionLinkInfo(section.id);
+            const isNextInChain = linkInfo && isNextVisibleInChain(section.id, linkInfo);
+            const colorStyle = isNextInChain ? `border-color: ${linkInfo.link.color}; border-width: 2px;` : '';
+            const colorDot = linkInfo ? `<span class="hidden-chip-color" style="background: ${linkInfo.link.color}"></span>` : '';
+            
+            return `
+                <div class="hidden-section-chip" data-section-id="${section.id}" title="Click to show" style="${colorStyle}">
+                    ${colorDot}
+                    <span class="hidden-chip-title">${escapeHtml(section.title)}</span>
+                    <span class="hidden-chip-icon">👁️</span>
+                </div>
+            `;
+        }).join('');
 
         // Add click handlers to unhide
         hiddenList.querySelectorAll('.hidden-section-chip').forEach(chip => {
@@ -135,12 +144,20 @@ function renderCards() {
 
     container.innerHTML = visibleSections.map(section => {
         const style = buildCardStyle(section);
+        const linkInfo = getSectionLinkInfo(section.id);
+        const linkIndicator = linkInfo ? `<span class="card-link-indicator" style="background: ${linkInfo.link.color}"></span>` : '';
+        const linkNavigation = linkInfo ? buildLinkNavigation(section.id, linkInfo) : '';
+        
         return `
             <div class="card" data-section-id="${section.id}" style="${style}">
                 <div class="card-drag-handle" title="Drag to reorder">⋮⋮</div>
+                ${linkIndicator}
                 <div class="card-title-row">
                     <div class="card-title">${escapeHtml(section.title)}</div>
-                    <button class="card-visibility-btn" title="Hide section">👁️</button>
+                    <div class="card-actions">
+                        ${linkNavigation}
+                        <button class="card-visibility-btn" title="Hide section">👁️</button>
+                    </div>
                 </div>
                 <div class="card-content">${section.content}</div>
                 <canvas class="doodle-canvas" style="display: none;"></canvas>
@@ -155,13 +172,98 @@ function renderCards() {
         `;
     }).join('');
 
-    // Attach resize, drag, doodle, and visibility handlers
+    // Attach resize, drag, doodle, visibility, and link navigation handlers
     container.querySelectorAll('.card').forEach(card => {
         setupCardResize(card);
         setupCardDrag(card);
         setupCardDoodle(card);
         setupCardVisibility(card);
+        setupLinkNavigation(card);
     });
+}
+
+function getSectionLinkInfo(sectionId) {
+    const link = (userData.links || []).find(l => l.sectionIds.includes(sectionId));
+    if (!link) return null;
+    
+    const index = link.sectionIds.indexOf(sectionId);
+    return {
+        link,
+        index,
+        isFirst: index === 0,
+        isLast: index === link.sectionIds.length - 1,
+        prevId: index > 0 ? link.sectionIds[index - 1] : null,
+        nextId: index < link.sectionIds.length - 1 ? link.sectionIds[index + 1] : null
+    };
+}
+
+function isNextVisibleInChain(sectionId, linkInfo) {
+    // Check if this hidden section is the next one that should be shown
+    // Find the last visible section in the chain before this one
+    const link = linkInfo.link;
+    const idx = linkInfo.index;
+    
+    // Look backwards to find a visible section
+    for (let i = idx - 1; i >= 0; i--) {
+        const section = userData.sections.find(s => s.id === link.sectionIds[i]);
+        if (section && !section.hidden) {
+            return true; // This section is next after a visible one
+        }
+    }
+    return false;
+}
+
+function buildLinkNavigation(sectionId, linkInfo) {
+    const prevDisabled = linkInfo.isFirst ? 'disabled' : '';
+    const nextDisabled = linkInfo.isLast ? 'disabled' : '';
+    
+    return `
+        <button class="link-nav-btn link-nav-prev" data-direction="prev" title="Previous linked section (hides this)" ${prevDisabled}>◀</button>
+        <button class="link-nav-btn link-nav-next" data-direction="next" title="Next linked section (hides this)" ${nextDisabled}>▶</button>
+    `;
+}
+
+function setupLinkNavigation(card) {
+    const prevBtn = card.querySelector('.link-nav-prev');
+    const nextBtn = card.querySelector('.link-nav-next');
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (prevBtn.disabled) return;
+            await navigateLink(card.dataset.sectionId, 'prev');
+        });
+    }
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (nextBtn.disabled) return;
+            await navigateLink(card.dataset.sectionId, 'next');
+        });
+    }
+}
+
+async function navigateLink(sectionId, direction) {
+    const linkInfo = getSectionLinkInfo(sectionId);
+    if (!linkInfo) return;
+
+    const targetId = direction === 'prev' ? linkInfo.prevId : linkInfo.nextId;
+    if (!targetId) return;
+
+    const currentSection = userData.sections.find(s => s.id === sectionId);
+    const targetSection = userData.sections.find(s => s.id === targetId);
+
+    if (currentSection && targetSection) {
+        currentSection.hidden = true;
+        targetSection.hidden = false;
+
+        const username = getCurrentUser();
+        if (username) {
+            await saveUserData(username, userData);
+        }
+        renderCards();
+    }
 }
 
 function setupEventListeners() {

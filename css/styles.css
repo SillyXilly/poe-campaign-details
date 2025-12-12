@@ -750,6 +750,180 @@ body {
     cursor: not-allowed;
 }
 
+/* Link Mode UI */
+.link-mode-active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.link-color-picker {
+    display: flex;
+    gap: 4px;
+}
+
+.link-color-option {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.link-color-option:hover {
+    transform: scale(1.15);
+}
+
+.link-color-option.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.link-count {
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.section-link-number {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.section-item.in-link-chain {
+    border-color: var(--accent);
+    background: rgba(196, 163, 90, 0.15);
+}
+
+.section-link-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Existing Links Display */
+.existing-links {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.existing-links-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+.existing-link-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.existing-link-item:last-child {
+    margin-bottom: 0;
+}
+
+.link-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.link-sections-preview {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.link-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.link-delete-btn:hover {
+    background: var(--bg-primary);
+    color: #e74c3c;
+}
+
+/* Card Link Indicator */
+.card-link-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 8px 0 0 8px;
+}
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.link-nav-btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: all 0.15s;
+}
+
+.link-nav-btn:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.link-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Hidden chip color indicator */
+.hidden-chip-color {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;
