@@ -153,11 +153,9 @@ function renderCards() {
                 <div class="card-drag-handle" title="Drag to reorder">⋮⋮</div>
                 ${linkIndicator}
                 <div class="card-title-row">
+                    ${linkNavigation ? `<div class="card-link-nav">${linkNavigation}</div>` : ''}
                     <div class="card-title">${escapeHtml(section.title)}</div>
-                    <div class="card-actions">
-                        ${linkNavigation}
-                        <button class="card-visibility-btn" title="Hide section">👁️</button>
-                    </div>
+                    <button class="card-visibility-btn" title="Hide section">👁️</button>
                 </div>
                 <div class="card-content">${section.content}</div>
                 <canvas class="doodle-canvas" style="display: none;"></canvas>
