@@ -738,11 +738,16 @@ function exportUserData() {
         return;
     }
 
+    // Ensure complete data structure
     const exportData = {
-        version: 1,
+        version: 2,
+        type: 'poe2-full-backup',
         username: username,
         exportDate: new Date().toISOString(),
-        data: userData
+        data: {
+            sections: userData.sections || [],
+            links: userData.links || []
+        }
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -765,17 +770,26 @@ async function importUserData(e) {
         const text = await file.text();
         const importData = JSON.parse(text);
 
-        // Validate import data
+        // Validate import data - support both old and new format
         if (!importData.data || !importData.data.sections) {
             throw new Error('Invalid backup file format');
+        }
+
+        // Ensure links array exists
+        if (!importData.data.links) {
+            importData.data.links = [];
         }
 
         const importUsername = importData.username || 'imported';
         const currentUsername = getCurrentUser();
 
+        const sectionsCount = importData.data.sections.length;
+        const linksCount = importData.data.links.length;
+
         // Ask user what to do
         const action = confirm(
-            `Import data from "${importUsername}"?\n\n` +
+            `Import data from "${importUsername}"?\n` +
+            `(${sectionsCount} sections, ${linksCount} link chains)\n\n` +
             `OK = Import as NEW user "${importUsername}"\n` +
             `Cancel = Merge into current user "${currentUsername || 'none'}"`
         );
@@ -801,8 +815,12 @@ async function importUserData(e) {
             // Create new user
             await createUser(targetUsername);
 
-            // Save imported data
-            await saveUserData(targetUsername, importData.data);
+            // Save imported data (complete with sections and links)
+            const dataToSave = {
+                sections: importData.data.sections,
+                links: importData.data.links
+            };
+            await saveUserData(targetUsername, dataToSave);
 
             // Refresh and select new user
             await loadUsers();
@@ -811,7 +829,7 @@ async function importUserData(e) {
             updateUserIcon(targetUsername);
             await loadUserData(targetUsername);
 
-            alert(`Data imported successfully as user "${targetUsername}"`);
+            alert(`Data imported successfully as user "${targetUsername}"\n(${sectionsCount} sections, ${linksCount} link chains)`);
         } else {
             // Merge into current user
             if (!currentUsername) {
@@ -821,20 +839,42 @@ async function importUserData(e) {
             }
 
             const mergeConfirm = confirm(
-                `This will ADD ${importData.data.sections.length} sections to "${currentUsername}".\n\n` +
-                `Existing sections will NOT be replaced. Continue?`
+                `This will ADD ${sectionsCount} sections and ${linksCount} link chains to "${currentUsername}".\n\n` +
+                `Existing data will NOT be replaced. Continue?`
             );
 
             if (mergeConfirm) {
+                // Create ID mapping for sections (old ID -> new ID)
+                const idMap = new Map();
+
                 // Add imported sections with new IDs
                 for (const section of importData.data.sections) {
-                    const newSection = { ...section, id: generateId() };
+                    const oldId = section.id;
+                    const newId = generateId();
+                    idMap.set(oldId, newId);
+                    
+                    const newSection = { ...section, id: newId };
                     userData.sections.push(newSection);
+                }
+
+                // Add imported links with updated section IDs
+                for (const link of importData.data.links) {
+                    const newLink = {
+                        id: generateId(),
+                        color: link.color,
+                        sectionIds: link.sectionIds.map(oldId => idMap.get(oldId) || oldId)
+                    };
+                    
+                    // Only add link if all sections were mapped
+                    if (newLink.sectionIds.every(id => idMap.has(id) || userData.sections.some(s => s.id === id))) {
+                        if (!userData.links) userData.links = [];
+                        userData.links.push(newLink);
+                    }
                 }
 
                 await saveUserData(currentUsername, userData);
                 renderCards();
-                alert(`${importData.data.sections.length} sections merged successfully`);
+                alert(`Merged successfully:\n- ${sectionsCount} sections\n- ${linksCount} link chains`);
             }
         }
     } catch (error) {
