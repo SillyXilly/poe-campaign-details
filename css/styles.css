@@ -924,6 +924,30 @@ body {
     flex-shrink: 0;
 }
 
+/* Import Preview */
+.import-preview {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.import-preview-item {
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.import-preview-item:last-child {
+    margin-bottom: 0;
+}
+
+.import-preview-title {
+    color: var(--text-primary);
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;

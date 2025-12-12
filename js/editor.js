@@ -7,6 +7,7 @@ let selectedSections = new Set();
 let linkMode = false;
 let linkChain = [];
 let selectedLinkColor = null;
+let pendingImportData = null;
 
 const LINK_COLORS = [
     { name: 'Red', color: '#e74c3c' },
@@ -393,6 +394,26 @@ function setupEventListeners() {
     // Initialize color picker
     initLinkColorPicker();
 
+    // Export sections
+    document.getElementById('bulkExportBtn').addEventListener('click', exportSelectedSections);
+
+    // Import sections
+    document.getElementById('importSectionsBtn').addEventListener('click', () => {
+        document.getElementById('importSectionsFile').click();
+    });
+    document.getElementById('importSectionsFile').addEventListener('change', handleImportFile);
+    document.getElementById('cancelImportSections').addEventListener('click', () => {
+        document.getElementById('importSectionsModal').style.display = 'none';
+        pendingImportData = null;
+    });
+    document.getElementById('confirmImportSections').addEventListener('click', confirmImportSections);
+    document.getElementById('importSectionsModal').addEventListener('click', (e) => {
+        if (e.target.id === 'importSectionsModal') {
+            document.getElementById('importSectionsModal').style.display = 'none';
+            pendingImportData = null;
+        }
+    });
+
     // Rich text toolbar
     document.querySelectorAll('.toolbar-btn[data-cmd]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -748,4 +769,133 @@ async function saveLink() {
 
     alert(`Linked ${linkChain.length} sections together!`);
     exitLinkMode();
+}
+
+// Export/Import sections
+function exportSelectedSections() {
+    if (selectedSections.size === 0) {
+        alert('Please select at least one section to export');
+        return;
+    }
+
+    const sectionsToExport = [];
+    for (const sectionId of selectedSections) {
+        const section = userData.sections.find(s => s.id === sectionId);
+        if (section) {
+            // Create a clean copy without the id (will be regenerated on import)
+            sectionsToExport.push({
+                title: section.title,
+                content: section.content,
+                order: section.order,
+                width: section.width,
+                height: section.height,
+                doodle: section.doodle
+            });
+        }
+    }
+
+    const exportData = {
+        version: 1,
+        type: 'poe2-sections-export',
+        exportDate: new Date().toISOString(),
+        sourceAct: currentAct,
+        sections: sectionsToExport
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `poe2-sections-${currentAct}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    alert(`Exported ${sectionsToExport.length} section${sectionsToExport.length > 1 ? 's' : ''}`);
+    exitBulkSelectMode();
+}
+
+async function handleImportFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const importData = JSON.parse(text);
+
+        // Validate import data
+        if (importData.type !== 'poe2-sections-export' || !importData.sections || !Array.isArray(importData.sections)) {
+            throw new Error('Invalid sections export file');
+        }
+
+        pendingImportData = importData;
+
+        // Set default target to current act
+        document.getElementById('importTargetAct').value = currentAct;
+
+        // Show preview
+        const preview = document.getElementById('importPreview');
+        preview.innerHTML = importData.sections.map(s => `
+            <div class="import-preview-item">
+                <span class="import-preview-title">${escapeHtml(s.title || 'Untitled')}</span>
+            </div>
+        `).join('');
+
+        // Update info text
+        document.getElementById('importSectionsInfo').textContent = 
+            `${importData.sections.length} section${importData.sections.length > 1 ? 's' : ''} found (from ${getActName(importData.sourceAct || 'unknown')})`;
+
+        // Show modal
+        document.getElementById('importSectionsModal').style.display = 'flex';
+    } catch (error) {
+        alert('Failed to read import file: ' + error.message);
+    }
+
+    e.target.value = '';
+}
+
+async function confirmImportSections() {
+    if (!pendingImportData || !pendingImportData.sections) {
+        alert('No import data available');
+        return;
+    }
+
+    const targetAct = document.getElementById('importTargetAct').value;
+    const existingSections = userData.sections.filter(s => s.act === targetAct);
+    let startOrder = existingSections.length;
+
+    // Import each section with new IDs
+    for (const section of pendingImportData.sections) {
+        const newSection = {
+            id: generateId(),
+            act: targetAct,
+            title: section.title || 'Untitled',
+            content: section.content || '',
+            order: startOrder++
+        };
+
+        // Copy optional properties
+        if (section.width) newSection.width = section.width;
+        if (section.height) newSection.height = section.height;
+        if (section.doodle) newSection.doodle = section.doodle;
+
+        userData.sections.push(newSection);
+    }
+
+    await saveAllData();
+
+    document.getElementById('importSectionsModal').style.display = 'none';
+    
+    // Switch to target act if different
+    if (targetAct !== currentAct) {
+        currentAct = targetAct;
+        document.getElementById('actSelect').value = currentAct;
+        updateNavigation();
+    }
+
+    alert(`Imported ${pendingImportData.sections.length} section${pendingImportData.sections.length > 1 ? 's' : ''} to ${getActName(targetAct)}`);
+    pendingImportData = null;
+    renderSectionList();
 }
